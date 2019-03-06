@@ -1,0 +1,36 @@
+language: python
+
+python:
+    - "3.6"
+
+env:
+  global:
+    - EPANET_HOME=`pwd`
+    - BUILD_HOME=buildprod
+    - TEST_HOME=nrtestsuite
+
+before_install:
+  - sudo apt-get -qq update
+
+install:
+  - sudo apt-get install -y libboost-test-dev
+  - sudo apt-get install -y libboost-thread-dev
+
+before_script:
+  - mkdir -p $BUILD_HOME
+  - cd $BUILD_HOME
+  - cmake -DBUILD_TESTS=ON -DBUILD_COVERAGE=ON ..
+
+script:
+  - cmake --build .
+  # run unit tests
+  - cd tests
+  - ctest
+  # run regression tests
+  - cd $EPANET_HOME
+  - pip install -r tools/requirements.txt
+  - tools/before-test.sh $TEST_HOME $EPANET_HOME/$BUILD_HOME/bin $TRAVIS_COMMIT
+  - tools/run-nrtest.sh -c -t $TEST_HOME -v $TRAVIS_COMMIT
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
