@@ -174,6 +174,7 @@
 #define   w_2COMP       "2COMP"
 #define   w_FIFO        "FIFO"
 #define   w_LIFO        "LIFO"
+#define   w_CSTR        "CSTR"
 
 #define   w_STATISTIC   "STAT"
 #define   w_AVG         "AVERAGE"

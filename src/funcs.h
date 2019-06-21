@@ -7,7 +7,7 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 02/08/2019
+ Last Updated: 05/15/2019
  ******************************************************************************
 */
 #ifndef FUNCS_H
@@ -17,13 +17,12 @@
 
 void    initpointers(Project *);
 int     allocdata(Project *);
-void    freeTmplist(STmplist *);
-void    freeFloatlist(SFloatlist *);
 void    freedata(Project *);
 
 int     openfiles(Project *, const char *, const char *,const char *);
 int     openhydfile(Project *);
 int     openoutfile(Project *);
+void    closeoutfile(Project *);
 
 int     buildadjlists(Network *);
 void    freeadjlists(Network *);
@@ -35,10 +34,23 @@ int     findlink(Network *, char *);
 int     findtank(Network *, int);
 int     findvalve(Network *, int);
 int     findpump(Network *, int);
+int     findpattern(Network *, char *);
+int     findcurve(Network *, char *);
+
+Pdemand finddemand(Pdemand, int);
+int     adddemand(Snode *, double, int, char *);
+void    freedemands(Snode *);
+
 void    adjustpatterns(Network *, int);
 void    adjustcurves(Network *, int);
+int     resizecurve(Scurve *, int);
 
+int     getcomment(Network *, int, int, char *);
+int     setcomment(Network *, int, int, const char *);
+
+int     namevalid(const char *);
 char    *getTmpName(char *);
+char    *xstrcpy(char **, const char *, const size_t n);
 int     strcomp(const char *, const char *);
 double  interp(int, double [], double [], double);
 char    *geterrmsg(int, char *);
@@ -60,8 +72,6 @@ void    convertunits(Project *);
 int     netsize(Project *);
 int     readdata(Project *);
 int     updatepumpparams(Project *, int);
-int     getpatterns(Project *);
-int     getcurves(Project *);
 int     findmatch(char *, char *[]);
 int     match(const char *, const char *);
 int     gettokens(char *, char **, int, char *);

@@ -7,15 +7,11 @@
   Authors:      see AUTHORS
   Copyright:    see AUTHORS
   License:      see LICENSE
-  Last Updated: 11/27/2018
+  Last Updated: 05/15/2019
  ******************************************************************************
  */
 
-#ifndef __APPLE__
-#include <malloc.h>
-#else
 #include <stdlib.h>
-#endif
 #include <string.h>
 #include "hash.h"
 
@@ -84,7 +80,7 @@ int hashtable_update(HashTable *ht, char *key, int new_data)
 {
     unsigned int i = gethash(key);
     DataEntry *entry;
-    
+
     if ( i >= HASHTABLEMAXSIZE ) return NOTFOUND;
     entry = ht[i];
     while (entry != NULL)
@@ -104,7 +100,7 @@ int hashtable_delete(HashTable *ht, char *key)
 {
     unsigned int i = gethash(key);
     DataEntry *entry, *preventry;
-    
+
     if ( i >= HASHTABLEMAXSIZE ) return NOTFOUND;
 
     preventry = NULL;
@@ -164,7 +160,7 @@ void hashtable_free(HashTable *ht)
 {
     DataEntry *entry, *nextentry;
     int i;
-    
+
     for (i = 0; i < HASHTABLEMAXSIZE; i++)
     {
         entry = ht[i];

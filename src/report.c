@@ -7,17 +7,13 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 11/27/2018
+ Last Updated: 05/15/2019
  ******************************************************************************
 */
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#ifndef __APPLE__
-#include <malloc.h>
-#else
-#include <stdlib.h>
-#endif
 
 #ifdef _WIN32
 #define snprintf _snprintf
@@ -83,7 +79,7 @@ int copyreport(Project* pr, char *filename)
     FILE *tfile;
     int c;
     Report *rpt = &pr->report;
-    
+
     // Check that project's report file exists
     if (rpt->RptFile == NULL) return 0;
 
@@ -98,15 +94,10 @@ int copyreport(Project* pr, char *filename)
     // Copy contents of project's report file
     if (rpt->RptFile)
     {
-        c = fgetc(rpt->RptFile);
-        while (c != EOF)
-        {
-            fputc(c, tfile);
-            c = fgetc(rpt->RptFile);
-        }
+        while ((c = fgetc(rpt->RptFile)) != EOF) fputc(c, tfile);
         fclose(rpt->RptFile);
     }
-    
+
     // Close destination file
     fclose(tfile);
 
@@ -240,7 +231,7 @@ void writesummary(Project *pr)
   Parser  *parser = &pr->parser;
   Times   *time = &pr->times;
 
-  char s[MAXFNAME + 1];
+  char s[MAXLINE + 1];
   int i;
   int nres = 0;
 
@@ -539,9 +530,6 @@ int writeresults(Project *pr)
   //         at each reporting time.
   //-----------------------------------------------------------
 
-    // Return if no output file
-    if (outFile == NULL) return 106;
-
     // Return if no nodes or links selected for reporting
     // or if no node or link report variables enabled
     if (!rpt->Nodeflag && !rpt->Linkflag)  return errcode;
@@ -551,6 +539,10 @@ int writeresults(Project *pr)
     nlv = 0;
     for (j = LENGTH; j <= FRICTION; j++) nlv += rpt->Field[j].Enabled;
     if (nnv == 0 && nlv == 0) return errcode;
+
+    // Return if no output file
+    if (outFile == NULL) outFile = fopen(pr->outfile.OutFname, "rb");
+    if (outFile == NULL) return 106;
 
     // Allocate memory for output variables:
     // m = larger of # node variables & # link variables
@@ -590,6 +582,13 @@ int writeresults(Project *pr)
             if (nlv > 0 && rpt->Linkflag > 0) writelinktable(pr, x);
             time->Htime += time->Rstep;
         }
+    }
+
+    // Free output file
+    if (outFile != NULL)
+    {
+        fclose(outFile);
+        outFile = NULL;
     }
 
     // Free allocated memory
@@ -1137,6 +1136,7 @@ int writehydwarn(Project *pr, int iter, double relerr)
     {
         disconnected(pr);
         pr->Warnflag = flag;
+        if (rpt->Messageflag) writeline(pr, " ");
     }
     return flag;
 }

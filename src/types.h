@@ -7,22 +7,23 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 01/01/2019
+ Last Updated: 05/15/2019
  ******************************************************************************
 */
 
 #ifndef TYPES_H
 #define TYPES_H
 
-#include "hash.h"
 #include <stdio.h>
+
+#include "hash.h"
 
 /*
 -------------------------------------------
    Definition of 4-byte integers & reals
 -------------------------------------------
 */
-typedef  float        REAL4;                                                   
+typedef  float        REAL4;
 typedef  int          INT4;
 
 /*
@@ -64,7 +65,7 @@ typedef  int          INT4;
    Flow units conversion factors
 ----------------------------------------------
 */
-#define   GPMperCFS   448.831 
+#define   GPMperCFS   448.831
 #define   AFDperCFS   1.9837
 #define   MGDperCFS   0.64632
 #define   IMGDperCFS  0.5382
@@ -91,9 +92,9 @@ typedef  int          INT4;
 
 /*
 ---------------------------------------------------------------------
-   Conversion macros to be used in place of functions             
+   Conversion macros to be used in place of functions
 ---------------------------------------------------------------------
-*/ 
+*/
 #define INT(x)   ((int)(x))                   // integer portion of x
 #define FRAC(x)  ((x)-(int)(x))               // fractional part of x
 #define ABS(x)   (((x)<0) ? -(x) : (x))       // absolute value of x
@@ -109,20 +110,24 @@ typedef  int          INT4;
 /*
 ------------------------------------------------------
    Macro to evaluate function x with error checking
-   (Fatal errors are numbered higher than 100)             
+   (Fatal errors are numbered higher than 100)
 ------------------------------------------------------
 */
-#define ERRCODE(x) (errcode = ((errcode>100) ? (errcode) : (x))) 
+#define ERRCODE(x) (errcode = ((errcode>100) ? (errcode) : (x)))
 
 /*
 ----------------------------------------------
    Enumerated Data Types
 ----------------------------------------------
- */
+*/
 
 typedef enum {
   NODE,
-  LINK
+  LINK,
+  TIMEPAT,
+  CURVE,
+  CONTROL,
+  RULE
 } ObjectType;
 
 typedef enum {
@@ -183,7 +188,7 @@ typedef enum {
   HILEVEL,       // act when grade above set level
   TIMER,         // act when set time reached
   TIMEOFDAY      // act when time of day occurs
-} ControlType;    
+} ControlType;
 
 typedef enum {
   XHEAD,         // pump cannot deliver head (closed)
@@ -202,12 +207,12 @@ typedef enum {
   HW,            // Hazen-Williams
   DW,            // Darcy-Weisbach
   CM             // Chezy-Manning
-} HeadLossType;    
+} HeadLossType;
 
 typedef enum {
   US,            // US
   SI             // SI (metric)
-} UnitsType;          
+} UnitsType;
 
 typedef enum {
   CFS,           // cubic feet per second
@@ -220,7 +225,7 @@ typedef enum {
   MLD,           // megaliters per day
   CMH,           // cubic meters per hour
   CMD            // cubic meters per day
-} FlowUnitsType;         
+} FlowUnitsType;
 
 typedef enum {
   PSI,           // pounds per square inch
@@ -232,14 +237,15 @@ typedef enum {
   LOW,           // lower limit
   HI,            // upper limit
   PREC           // precision
-} RangeType;        
+} RangeType;
 
 typedef enum {
   MIX1,          // complete mix model
   MIX2,          // 2-compartment model
   FIFO,          // first in, first out model
-  LIFO           // last in, first out model
-} MixType;       
+  LIFO,           // last in, first out model
+  CSTR
+} MixType;
 
 typedef enum {
   SERIES,        // point time series
@@ -255,7 +261,7 @@ typedef enum {
   HEAD,          // nodal hydraulic head
   PRESSURE,      // nodal pressure
   QUALITY,       // nodal water quality
-  
+
   LENGTH,        // link length
   DIAM,          // link diameter
   FLOW,          // link flow rate
@@ -266,7 +272,7 @@ typedef enum {
   SETTING,       // pump/valve setting
   REACTRATE,     // avg. reaction rate in link
   FRICTION,      // link friction factor
-  
+
   POWER,         // pump power output
   TIME,          // simulation time
   VOLUME,        // tank volume
@@ -289,7 +295,7 @@ typedef enum {
   ENERHDR,       // energy usage header
   NODEHDR,       // node results header
   LINKHDR        // link results header
-} HdrType;    
+} HdrType;
 
 typedef enum {
   NEGATIVE  = -1,  // flow in reverse of pre-assigned direction
@@ -298,13 +304,13 @@ typedef enum {
 } FlowDirection;
 
 typedef enum {
-  DDA,           // demand driven analysis    
+  DDA,           // demand driven analysis
   PDA            // pressure driven analysis
 } DemandModelType;
 
 /*
 ------------------------------------------------------
-   Fundamental Data Structures                             
+   Fundamental Data Structures
 ------------------------------------------------------
 */
 
@@ -313,26 +319,10 @@ struct IDstring            // Holds component ID label
   char ID[MAXID+1];
 };
 
-struct  Floatlist          // Element of List of Numbers
-{
-  double  value;           // element's numerical value
-  struct  Floatlist *next; // next element on the list
-};
-typedef struct Floatlist SFloatlist;
-
-struct  Tmplist            // Item of Temporary List of Objects
-{
-  int        i;            // object's index
-  char       ID[MAXID+1];  // object's ID name
-  SFloatlist *x;           // list of data values 
-  SFloatlist *y;           // list of data values
-  struct     Tmplist *next; // next object on list
-};
-typedef struct Tmplist STmplist; // Pointer to temporary list of objects
-
 typedef struct             // Time Pattern Object
 {
   char   ID[MAXID+1];      // pattern ID
+  char   *Comment;         // pattern comment
   int    Length;           // pattern length
   double *F;               // pattern factors
 } Spattern;
@@ -340,8 +330,10 @@ typedef struct             // Time Pattern Object
 typedef struct             // Curve Object
 {
   char      ID[MAXID+1];   // curve ID
+  char      *Comment;      // curve comment
   CurveType Type;          // curve type
   int       Npts;          // number of points
+  int       Capacity;      // size of X & Y arrays
   double    *X;            // x-values
   double    *Y;            // y-values
 } Scurve;
@@ -350,7 +342,7 @@ struct Sdemand             // Demand List Item
 {
   double Base;             // baseline demand
   int    Pat;              // pattern index
-  char   Name[MAXMSG+1];   // demand category name
+  char   *Name;            // demand category name
   struct Sdemand *next;    // next demand list item
 };
 typedef struct Sdemand *Pdemand; // Pointer to demand list
@@ -386,14 +378,14 @@ typedef struct             // Node Object
   double   Ke;             // emitter coeff.
   int      Rpt;            // reporting flag
   NodeType Type;           // node type
-  char Comment[MAXMSG+1];  // node comment
+  char     *Comment;       // node comment
 } Snode;
 
 typedef struct             // Link Object
 {
   char     ID[MAXID+1];    // link ID
   int      N1;             // start node index
-  int      N2;             // end node index 
+  int      N2;             // end node index
   double   Diam;           // diameter
   double   Len;            // length
   double   Kc;             // roughness
@@ -406,7 +398,7 @@ typedef struct             // Link Object
   LinkType Type;           // link type
   StatusType Status;       // initial status
   int      Rpt;            // reporting flag
-  char Comment[MAXMSG+1];  // link Comment
+  char     *Comment;       // link comment
 } Slink;
 
 typedef struct             // Tank Object
@@ -520,7 +512,7 @@ typedef struct s_ActionItem    // Action List Item
 {
     int     ruleIndex;           // index of rule action belongs to
     Saction *action;             // an action clause
-    struct  s_ActionItem *next;  // next action on the list   
+    struct  s_ActionItem *next;  // next action on the list
 } SactionList;
 
 typedef struct                 // Mass Balance Components
@@ -542,14 +534,15 @@ typedef struct                 // Mass Balance Components
 // Input File Parser Wrapper
 typedef struct {
   FILE *InFile;            // Input file handle
-  
+
   char
-    DefPatID[MAXID+1],     // Default demand pattern ID
-    InpFname[MAXFNAME+1],  // Input file name
-    *Tok[MAXTOKS],         // Array of token strings
-    Comment[MAXMSG+1];     // Comment text
-  
-  int      
+      DefPatID[MAXID + 1],     // Default demand pattern ID
+      InpFname[MAXFNAME + 1],  // Input file name
+      *Tok[MAXTOKS],           // Array of token strings
+      Comment[MAXMSG + 1],     // Comment text
+      LineComment[MAXMSG + 1]; // Full line comment
+
+  int
     MaxNodes,              // Node count   from input file */
     MaxLinks,              // Link count    "    "    "
     MaxJuncs,              // Junction count "   "    "
@@ -566,14 +559,11 @@ typedef struct {
     ErrTok,                // Index of error-producing token
     Unitsflag,             // Unit system flag
     Flowflag,              // Flow units flag
-    Pressflag;             // Pressure units flag
-  
-  STmplist 
-    *Patlist,              // Temporary time pattern list
-    *PrevPat,              // Previous pattern list element
-    *Curvelist,            // Temporary list of curves
-    *PrevCurve;            // Previous curve list element
+    Pressflag,             // Pressure units flag
+    DefPat;                // Default demand pattern
 
+  Spattern *PrevPat;       // Previous pattern processed
+  Scurve   *PrevCurve;     // Previous curve processed
   double *X;               // Temporary array for curve data
 
 } Parser;
@@ -602,7 +592,7 @@ typedef struct {
 typedef struct {
 
   FILE *RptFile;           // Report file handle
-  
+
   int
     Nperiods,              // Number of reporting periods
     PageSize,              // Lines/page in output report/
@@ -619,13 +609,13 @@ typedef struct {
   long
     LineNum,               // Current line number
     PageNum;               // Current page number
-  
+
   char
     Atime[13],             // Clock time (hrs:min:sec)
     Rpt1Fname[MAXFNAME+1], // Primary report file name
     Rpt2Fname[MAXFNAME+1], // Secondary report file name
     DateStamp[26];         // Current date & time
-  
+
   SField   Field[MAXVAR];  // Output reporting fields
 
 } Report;
@@ -636,19 +626,19 @@ typedef struct {
   char
     HydFname[MAXFNAME+1],  // Hydraulics file name
     OutFname[MAXFNAME+1];  // Binary output file name
-    
+
   int
     Outflag,               // Output file flag
     Hydflag,               // Hydraulics flag
     SaveHflag,             // Hydraulic results saved flag
     SaveQflag,             // Quality results saved flag
     Saveflag;              // General purpose save flag
-  
-  long     
+
+  long
     HydOffset,             // Hydraulics file byte offset
     OutOffset1,            // 1st output file byte offset
     OutOffset2;            // 2nd output file byte offset
-  
+
   FILE
     *OutFile,              // Output file handle
     *HydFile,              // Hydraulics file handle
@@ -677,7 +667,7 @@ typedef struct {
     *Aij,        // Non-zero, off-diagonal matrix coeffs.
     *F,          // Right hand side vector
     *temp;       // Array used by linear eqn. solver
-  
+
   int
     Ncoeffs,     // Number of non-zero matrix coeffs
     *Order,      // Node-to-row of re-ordered matrix
@@ -695,7 +685,7 @@ typedef struct {
 // Hydraulics Solver Wrapper
 typedef struct {
 
-  double  
+  double
     *NodeHead,             // Node hydraulic heads
     *NodeDemand,           // Node demand + emitter flows
     *DemandFlow,           // Demand outflows
@@ -723,15 +713,14 @@ typedef struct {
     Dcost,                 // Energy demand charge/kw/day
     Emax,                  // Peak energy usage
     RelativeError,         // Total flow change / total flow
-    MaxHeadError,          // Max. error for link head loss 
+    MaxHeadError,          // Max. error for link head loss
     MaxFlowChange,         // Max. change in link flow
     RelaxFactor,           // Relaxation factor for flow updating
     *P,                    // Inverse of head loss derivatives
     *Y,                    // Flow correction factors
     *Xflow;                // Inflow - outflow at each node
-  
+
   int
-    DefPat,                // Default demand pattern
     Epat,                  // Energy cost time pattern
     DemandModel,           // Fixed or pressure dependent
     Formflag,              // Head loss formula flag
@@ -743,10 +732,10 @@ typedef struct {
     OpenHflag,             // Hydraulic system opened flag
     Haltflag;              // Flag to halt simulation
 
-  StatusType  
+  StatusType
     *LinkStatus,           // Link status
     *OldStatus;            // Previous link/tank status
-  
+
   Smatrix smatrix;         // Sparse matrix storage
 
 } Hydraul;
@@ -760,7 +749,7 @@ typedef struct {
   int
     Qualflag,              // Water quality analysis flag
     OpenQflag,             // Quality system opened flag
-    Reactflag,             // Reaction indicator 
+    Reactflag,             // Reaction indicator
     OutOfMemory,           // Out of memory indicator
     TraceNode,             // Source node for flow tracing
     *SortedNodes;          // Topologically sorted node indexes
@@ -781,17 +770,17 @@ typedef struct {
     Bucf,                  // Bulk reaction units conversion factor
     Tucf,                  // Tank reaction units conversion factor
     BulkOrder,             // Bulk flow reaction order
-    WallOrder,             // Pipe wall reaction order     
-    TankOrder,             // Tank reaction order          
-    Kbulk,                 // Global bulk reaction coeff.  
-    Kwall,                 // Global wall reaction coeff.  
+    WallOrder,             // Pipe wall reaction order
+    TankOrder,             // Tank reaction order
+    Kbulk,                 // Global bulk reaction coeff.
+    Kwall,                 // Global wall reaction coeff.
     Climit,                // Limiting potential quality
     SourceQual,            // External source quality
     *NodeQual,             // Reported node quality state
     *PipeRateCoeff;        // Pipe reaction rate coeffs.
 
   struct Mempool
-    *SegPool;              // Memory pool for water quality segments   
+    *SegPool;              // Memory pool for water quality segments
 
   Pseg
     FreeSeg,               // Pointer to unused segment
@@ -821,7 +810,7 @@ typedef struct {
     Nrules,                // Number of control rules
     Npats,                 // Number of time patterns
     Ncurves;               // Number of data curves
-  
+
   Snode    *Node;          // Node array
   Slink    *Link;          // Link array
   Stank    *Tank;          // Tank array
@@ -849,13 +838,13 @@ typedef struct Project {
   Rules      rules;              // Rule-based controls wrapper
   Hydraul    hydraul;            // Hydraulics solver wrapper
   Quality    quality;            // Water quality solver wrapper
-  
+
   double Ucf[MAXVAR];            // Unit conversion factors
-  
+
   int
     Openflag,                    // Project open flag
     Warnflag;                    // Warning flag
-    
+
   char
     Msg[MAXMSG+1],               // General-purpose string: errors, messages
     Title[MAXTITLE][TITLELEN+1], // Project title
@@ -863,9 +852,9 @@ typedef struct Project {
     TmpHydFname[MAXFNAME+1],     // Temporary hydraulics file name
     TmpOutFname[MAXFNAME+1],     // Temporary output file name
     TmpStatFname[MAXFNAME+1];    // Temporary statistic file name
-  
-  void (* viewprog) (char *);    // Pointer to progress viewing function   
-  
+
+  void (* viewprog) (char *);    // Pointer to progress viewing function
+
 } Project, *EN_Project;
 
 #endif

@@ -3,8 +3,9 @@ LIBRARY     EPANET2.DLL
 EXPORTS
     ENaddcontrol                  = _ENaddcontrol@24                    
     ENaddcurve                    = _ENaddcurve@4                     
-    ENaddlink                     = _ENaddlink@16
-    ENaddnode                     = _ENaddnode@8
+    ENaddlink                     = _ENaddlink@20
+    ENaddnode                     = _ENaddnode@12
+    ENadddemand                   = _ENadddemand@16
     ENaddpattern                  = _ENaddpattern@4
     ENaddrule                     = _ENaddrule@4
     ENclearreport                 = _ENclearreport@0
@@ -14,6 +15,7 @@ EXPORTS
     ENcopyreport                  = _ENcopyreport@4
     ENdeletecontrol               = _ENdeletecontrol@4
     ENdeletecurve                 = _ENdeletecurve@4
+    ENdeletedemand                = _ENdeletedemand@8
     ENdeletelink                  = _ENdeletelink@8
     ENdeletenode                  = _ENdeletenode@8
     ENdeletepattern               = _ENdeletepattern@4
@@ -21,6 +23,7 @@ EXPORTS
     ENepanet                      = _ENepanet@16
     ENgetaveragepatternvalue      = _ENgetaveragepatternvalue@8
     ENgetbasedemand               = _ENgetbasedemand@12
+    ENgetcomment                  = _ENgetcomment@12
     ENgetcontrol                  = _ENgetcontrol@24                    
     ENgetcoord                    = _ENgetcoord@12
     ENgetcount                    = _ENgetcount@8                       
@@ -29,7 +32,8 @@ EXPORTS
     ENgetcurveindex               = _ENgetcurveindex@8                
     ENgetcurvelen                 = _ENgetcurvelen@8                  
     ENgetcurvetype                = _ENgetcurvetype@8
-    ENgetcurvevalue               = _ENgetcurvevalue@16               
+    ENgetcurvevalue               = _ENgetcurvevalue@16 
+    ENgetdemandindex              = _ENgetdemandindex@12
     ENgetdemandmodel              = _ENgetdemandmodel@16
     ENgetdemandname               = _ENgetdemandname@12
     ENgetdemandpattern            = _ENgetdemandpattern@12
@@ -80,6 +84,7 @@ EXPORTS
     ENsavehydfile                 = _ENsavehydfile@4                    
     ENsaveinpfile                 = _ENsaveinpfile@4                    
     ENsetbasedemand               = _ENsetbasedemand@12
+    ENsetcomment                  = _ENsetcomment@12
     ENsetcontrol                  = _ENsetcontrol@24                    
     ENsetcoord                    = _ENsetcoord@20
     ENsetcurve                    = _ENsetcurve@16

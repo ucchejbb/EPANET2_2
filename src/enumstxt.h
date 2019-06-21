@@ -103,7 +103,8 @@ char *TstatTxt[]        = {w_NONE,
 char *MixTxt[]          = {w_MIXED,
                            w_2COMP,
                            w_FIFO,
-                           w_LIFO, 
+                           w_LIFO,
+	                       w_CSTR,
                            NULL};
 
 char *RptFlagTxt[]      = {w_NO,

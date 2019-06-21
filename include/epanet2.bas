@@ -5,7 +5,7 @@ Attribute VB_Name = "Module1"
 'Declarations of functions in the EPANET PROGRAMMERs TOOLKIT
 '(EPANET2.DLL)
 
-'Last updated on 02/28/2019
+'Last updated on 03/17/2019
 
 ' These are codes used by the DLL functions
 Public Const EN_ELEVATION = 0     ' Node parameters
@@ -83,6 +83,13 @@ Public Const EN_MAXHEADERROR = 2
 Public Const EN_MAXFLOWCHANGE = 3
 Public Const EN_MASSBALANCE = 4
 
+Public Const EN_NODE = 0          ' Component types
+Public Const EN_LINK = 1
+Public Const EN_TIMEPAT = 2
+Public Const EN_CURVE = 3
+Public Const EN_CONTROL = 4
+Public Const EN_RULE = 5 
+
 Public Const EN_NODECOUNT = 0     ' Component counts
 Public Const EN_TANKCOUNT = 1
 Public Const EN_LINKCOUNT = 2
@@ -133,19 +140,29 @@ Public Const EN_CMD = 9
 Public Const EN_DDA = 0           ' Demand driven analysis
 Public Const EN_PDA = 1           ' Pressure driven analysis
 
-Public Const EN_TRIALS = 0        ' Hydraulic options
+Public Const EN_TRIALS = 0        ' Simulation options
 Public Const EN_ACCURACY = 1
 Public Const EN_TOLERANCE = 2
 Public Const EN_EMITEXPON = 3
 Public Const EN_DEMANDMULT = 4
 Public Const EN_HEADERROR = 5
 Public Const EN_FLOWCHANGE = 6
-Public Const EN_DEMANDDEFPAT = 7
-Public Const EN_HEADLOSSFORM = 8
-Public Const EN_GLOBALEFFIC = 9
-Public Const EN_GLOBALPRICE = 10
-Public Const EN_GLOBALPATTERN = 11
-Public Const EN_DEMANDCHARGE = 12
+Public Const EN_HEADLOSSFORM = 7
+Public Const EN_GLOBALEFFIC = 8
+Public Const EN_GLOBALPRICE = 9
+Public Const EN_GLOBALPATTERN = 10
+Public Const EN_DEMANDCHARGE = 11
+Public Const EN_SP_GRAVITY = 12
+Public Const EN_SP_VISCOS  = 13
+Public Const EN_UNBALANCED = 14
+Public Const EN_CHECKFREQ = 15
+Public Const EN_MAXCHECK = 16
+Public Const EN_DAMPLIMIT = 17
+Public Const EN_SP_DIFFUS = 18
+Public Const EN_BULKORDER = 19
+Public Const EN_WALLORDER = 20
+Public Const EN_TANKORDER = 21
+Public Const EN_CONCENLIMIT = 22
 
 Public Const EN_LOWLEVEL = 0      ' Control types
 Public Const EN_HILEVEL = 1
@@ -161,6 +178,7 @@ Public Const EN_MIX1 = 0          ' Tank mixing models
 Public Const EN_MIX2 = 1
 Public Const EN_FIFO = 2
 Public Const EN_LIFO = 3
+Public Const EN_CSTR = 4
 
 Public Const EN_NOSAVE = 0        ' Save-results-to-file flag
 Public Const EN_SAVE = 1
@@ -274,7 +292,7 @@ Public Const EN_R_IS_ACTIVE = 3
  Declare Function ENsetqualtype Lib "epanet2.dll" (ByVal qualType As Long, ByVal chemName As String, ByVal chemUnits As String, ByVal traceNode As String) As Long
 
 'Node Functions
- Declare Function ENaddnode Lib "epanet2.dll" (ByVal id As String, ByVal nodeType As Long) As Long
+ Declare Function ENaddnode Lib "epanet2.dll" (ByVal id As String, ByVal nodeType As Long, index As Long) As Long
  Declare Function ENdeletenode Lib "epanet2.dll" (ByVal index As Long, ByVal actionCode As Long) As Long
  Declare Function ENgetnodeindex Lib "epanet2.dll" (ByVal id As String, index As Long) As Long
  Declare Function ENgetnodeid Lib "epanet2.dll" (ByVal index As Long, ByVal id As String) As Long
@@ -290,6 +308,9 @@ Public Const EN_R_IS_ACTIVE = 3
 'Nodal Demand Functions
  Declare Function ENgetdemandmodel Lib "epanet2.dll" (type_ As Long, pmin As Single, preq As Single, pexp As Single) As Long
  Declare Function ENsetdemandmodel Lib "epanet2.dll" (ByVal type_ As Long, ByVal pmin As Single, ByVal preq As Single, ByVal pexp As Single) As Long
+ Declare Function ENadddemand Lib "epanet2.dll" (ByVal nodeIndex As Long, ByVal baseDemand As Single, ByVal patternName As String, ByVal demandName As String) As Long
+ Declare Function ENdeletedemand Lib "epanet2.dll" (ByVal nodeIndex As Long, ByVal demandIndex As Long) As Long
+ Declare Function ENgetdemandindex Lib "epanet2.dll" (ByVal nodeIndex As Long, ByVal demandName As String, demandIndex As Long) As Long
  Declare Function ENgetnumdemands Lib "epanet2.dll" (ByVal nodeIndex As Long, numDemands As Long) As Long
  Declare Function ENgetbasedemand Lib "epanet2.dll" (ByVal nodeIndex As Long, ByVal demandIndex As Long, value As Single) As Long
  Declare Function ENsetbasedemand Lib "epanet2.dll" (ByVal nodeIndex As Long, ByVal demandIndex As Long, ByVal BaseDemand As Single) As Long
@@ -299,7 +320,7 @@ Public Const EN_R_IS_ACTIVE = 3
  Declare Function ENsetdemandname Lib "epanet2.dll" (ByVal nodeIndex As Long, ByVal demandIndex As Long, ByVal demandName As String) As Long
 
 'Link Functions
- Declare Function ENaddlink Lib "epanet2.dll" (ByVal id As String, ByVal linkType As Long, ByVal fromNode As String, ByVal toNode As String) As Long
+ Declare Function ENaddlink Lib "epanet2.dll" (ByVal id As String, ByVal linkType As Long, ByVal fromNode As String, ByVal toNode As String, index As Long) As Long
  Declare Function ENdeletelink Lib "epanet2.dll" (ByVal index As Long, ByVal actionCode As Long) As Long
  Declare Function ENgetlinkindex Lib "epanet2.dll" (ByVal id As String, index As Long) As Long
  Declare Function ENgetlinkid Lib "epanet2.dll" (ByVal index As Long, ByVal id As String) As Long

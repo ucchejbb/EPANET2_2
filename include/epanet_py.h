@@ -36,6 +36,7 @@ int EXPORT_PY_API proj_init(Handle ph, const char *rptFile, const char *outFile,
 int EXPORT_PY_API proj_open(Handle ph, const char *inpFile, const char *rptFile, const char *binOutFile);
 int EXPORT_PY_API proj_gettitle(Handle ph, char *line1, char *line2, char *line3);
 int EXPORT_PY_API proj_settitle(Handle ph, const char *line1, const char *line2, const char *line3);
+int EXPORT_PY_API proj_getcount(Handle ph, EN_CountType code, int *count);
 int EXPORT_PY_API proj_savefile(Handle ph, const char *inpfilename);
 int EXPORT_PY_API proj_close(Handle ph);
 
@@ -66,7 +67,6 @@ int EXPORT_PY_API rprt_clear(Handle ph);
 int EXPORT_PY_API rprt_reset(Handle ph);
 int EXPORT_PY_API rprt_set(Handle ph, char *reportCommand);
 int EXPORT_PY_API rprt_setlevel(Handle ph, EN_StatusReport code);
-int EXPORT_PY_API rprt_getcount(Handle ph, EN_CountType code, int *count);
 int EXPORT_PY_API rprt_anlysstats(Handle ph, EN_AnalysisStatistic code, double* value);
 
 
@@ -81,7 +81,7 @@ int EXPORT_PY_API anlys_getqualtype(Handle ph, int *qualcode, int *tracenode);
 int EXPORT_PY_API anlys_setqualtype(Handle ph, EN_QualityType qualcode, char *chemname, char *chemunits, char *tracenode);
 
 
-int EXPORT_PY_API node_add(Handle ph, char *id, EN_NodeType nodeType);
+int EXPORT_PY_API node_add(Handle ph, char *id, EN_NodeType nodeType, int *index);
 int EXPORT_PY_API node_delete(Handle ph, int index, int actionCode);
 int EXPORT_PY_API node_getindex(Handle ph, char *id, int *index);
 int EXPORT_PY_API node_getid(Handle ph, int index, char *id);
@@ -104,7 +104,7 @@ int EXPORT_PY_API dmnd_getname(Handle ph, int nodeIndex, int demandIdx, char *de
 int EXPORT_PY_API dmnd_setname(Handle ph, int nodeIndex, int demandIdx, char *demandName);
 
 
-int EXPORT_PY_API link_add(Handle ph, char *id, EN_LinkType linkType, char *fromNode, char *toNode);
+int EXPORT_PY_API link_add(Handle ph, char *id, EN_LinkType linkType, char *fromNode, char *toNode, int *index);
 int EXPORT_PY_API link_delete(Handle ph, int index, int actionCode);
 int EXPORT_PY_API link_getindex(Handle ph, char *id, int *index);
 int EXPORT_PY_API link_getid(Handle ph, int index, char *id);
@@ -139,7 +139,7 @@ int EXPORT_PY_API curv_getlength(Handle ph, int index, int *len);
 int EXPORT_PY_API curv_gettype(Handle ph, int curveIndex, int *outType);
 int EXPORT_PY_API curv_getvalue(Handle ph, int curveIndex, int pointIndex, double *x, double *y);
 int EXPORT_PY_API curv_setvalue(Handle ph, int curveIndex, int pointIndex, double x, double y);
-int EXPORT_PY_API curv_get(Handle ph, int curveIndex, char* id, int *nValues, double **xValues, double **yValues);
+int EXPORT_PY_API curv_get(Handle ph, int curveIndex, char* id, int *nValues, double *xValues, double *yValues);
 int EXPORT_PY_API curv_set(Handle ph, int index, double *x, double *y, int len);
 
 int EXPORT_PY_API scntl_add(Handle ph, int type, int linkIndex, double setting, int nodeIndex, double level, int *index);

@@ -7,7 +7,7 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 11/27/2018
+ Last Updated: 05/15/2019
  ******************************************************************************
 */
 /*
@@ -18,13 +18,9 @@
    linsolve()     -- called from netsolve() in HYDRAUL.C
 */
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#ifndef __APPLE__
-#include <malloc.h>
-#else
-#include <stdlib.h>
-#endif
 #include <math.h>
 #include <limits.h>
 

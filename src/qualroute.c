@@ -7,17 +7,14 @@ Description:  computes water quality transport over a single time step
 Authors:      see AUTHORS
 Copyright:    see AUTHORS
 License:      see LICENSE
-Last Updated: 11/27/2018
+Last Updated: 05/15/2019
 ******************************************************************************
 */
 
-#include <stdio.h>
-#ifndef __APPLE__
-#include <malloc.h>
-#else
 #include <stdlib.h>
-#endif
+#include <stdio.h>
 #include <math.h>
+
 #include "mempool.h"
 #include "types.h"
 

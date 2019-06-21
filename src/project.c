@@ -7,17 +7,13 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 01/01/2019
+ Last Updated: 05/24/2019
  ******************************************************************************
 */
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#ifndef __APPLE__
-#include <malloc.h>
-#else
-#include <stdlib.h>
-#endif
 
 //*** For the Windows SDK _tempnam function ***//
 #ifdef _WIN32
@@ -26,6 +22,7 @@
 
 #include "types.h"
 #include "funcs.h"
+
 
 int openfiles(Project *pr, const char *f1, const char *f2, const char *f3)
 /*----------------------------------------------------------------
@@ -43,13 +40,18 @@ int openfiles(Project *pr, const char *f1, const char *f2, const char *f3)
     pr->report.RptFile = NULL;
     pr->outfile.OutFile = NULL;
     pr->outfile.HydFile = NULL;
+    pr->outfile.TmpOutFile = NULL;
 
     // Save file names
     strncpy(pr->parser.InpFname, f1, MAXFNAME);
     strncpy(pr->report.Rpt1Fname, f2, MAXFNAME);
     strncpy(pr->outfile.OutFname, f3, MAXFNAME);
     if (strlen(f3) > 0) pr->outfile.Outflag = SAVE;
-    else                pr->outfile.Outflag = SCRATCH;
+    else
+    {
+        pr->outfile.Outflag = SCRATCH;
+        strcpy(pr->outfile.OutFname, pr->TmpOutFname);
+    }
 
     // Check that file names are not identical
     if (strlen(f1) > 0 && (strcomp(f1, f2) || strcomp(f1, f3))) return 301;
@@ -95,6 +97,7 @@ int openhydfile(Project *pr)
     {
         if (pr->outfile.Hydflag == SCRATCH) return 0;
         fclose(pr->outfile.HydFile);
+        pr->outfile.HydFile = NULL;
     }
 
     // Use Hydflag to determine the type of hydraulics file to use.
@@ -167,30 +170,12 @@ int openoutfile(Project *pr)
     int errcode = 0;
 
     // Close output file if already opened
-    if (pr->outfile.OutFile != NULL)
-    {
-        fclose(pr->outfile.OutFile);
-        pr->outfile.OutFile = NULL;
-    }
-    if (pr->outfile.TmpOutFile != NULL)
-    {
-        fclose(pr->outfile.TmpOutFile);
-        pr->outfile.TmpOutFile = NULL;
-    }
+    closeoutfile(pr);
 
     // If output file name was supplied, then attempt to
     // open it. Otherwise open a temporary output file.
-    if (pr->outfile.Outflag == SAVE)
-    {
-        pr->outfile.OutFile = fopen(pr->outfile.OutFname, "w+b");
-        if (pr->outfile.OutFile == NULL) errcode = 304;
-    }
-    else
-    {
-        strcpy(pr->outfile.OutFname, pr->TmpOutFname);
-        pr->outfile.OutFile = fopen(pr->outfile.OutFname, "w+b");
-        if (pr->outfile.OutFile == NULL) errcode = 304;
-    }
+    pr->outfile.OutFile = fopen(pr->outfile.OutFname, "w+b");
+    if (pr->outfile.OutFile == NULL) errcode = 304;
 
     // Save basic network data & energy usage results
     ERRCODE(savenetdata(pr));
@@ -209,6 +194,33 @@ int openoutfile(Project *pr)
         else pr->outfile.TmpOutFile = pr->outfile.OutFile;
     }
     return errcode;
+}
+
+void closeoutfile(Project *pr)
+/*----------------------------------------------------------------
+**  Input:   none
+**  Output:  none
+**  Purpose: closes binary output file.
+**----------------------------------------------------------------
+*/
+{
+    if (pr->outfile.TmpOutFile != pr->outfile.OutFile)
+    {
+        if (pr->outfile.TmpOutFile != NULL)
+        {
+            fclose(pr->outfile.TmpOutFile);
+            pr->outfile.TmpOutFile = NULL;
+        }
+    }
+    if (pr->outfile.OutFile != NULL)
+    {
+        if (pr->outfile.OutFile == pr->outfile.TmpOutFile)
+        {
+            pr->outfile.TmpOutFile = NULL;
+        }
+        fclose(pr->outfile.OutFile);
+        pr->outfile.OutFile = NULL;
+    }
 }
 
 void initpointers(Project *pr)
@@ -257,9 +269,6 @@ void initpointers(Project *pr)
     pr->network.NodeHashTable = NULL;
     pr->network.LinkHashTable = NULL;
 
-    pr->parser.Patlist = NULL;
-    pr->parser.Curvelist = NULL;
-
     pr->hydraul.smatrix.Aii = NULL;
     pr->hydraul.smatrix.Aij = NULL;
     pr->hydraul.smatrix.F = NULL;
@@ -300,10 +309,10 @@ int allocdata(Project *pr)
     if (!errcode)
     {
         n = pr->parser.MaxNodes + 1;
-        pr->network.Node          = (Snode *)calloc(n, sizeof(Snode));
+        pr->network.Node       = (Snode *)calloc(n, sizeof(Snode));
         pr->hydraul.NodeDemand = (double *)calloc(n, sizeof(double));
         pr->hydraul.NodeHead   = (double *)calloc(n, sizeof(double));
-        pr->quality.NodeQual      = (double *)calloc(n, sizeof(double));
+        pr->quality.NodeQual   = (double *)calloc(n, sizeof(double));
         ERRCODE(MEMCHECK(pr->network.Node));
         ERRCODE(MEMCHECK(pr->hydraul.NodeDemand));
         ERRCODE(MEMCHECK(pr->hydraul.NodeHead));
@@ -314,8 +323,8 @@ int allocdata(Project *pr)
     if (!errcode)
     {
         n = pr->parser.MaxLinks + 1;
-        pr->network.Link           = (Slink *)calloc(n, sizeof(Slink));
-        pr->hydraul.LinkFlow   = (double *)calloc(n, sizeof(double));
+        pr->network.Link        = (Slink *)calloc(n, sizeof(Slink));
+        pr->hydraul.LinkFlow    = (double *)calloc(n, sizeof(double));
         pr->hydraul.LinkSetting = (double *)calloc(n, sizeof(double));
         pr->hydraul.LinkStatus  = (StatusType *)calloc(n, sizeof(StatusType));
         ERRCODE(MEMCHECK(pr->network.Link));
@@ -324,8 +333,8 @@ int allocdata(Project *pr)
         ERRCODE(MEMCHECK(pr->hydraul.LinkStatus));
     }
 
-    // Allocate memory for tanks, sources, pumps, valves,
-    // controls, demands, time patterns, & operating curves
+    // Allocate memory for tanks, sources, pumps, valves, and controls
+    // (memory for Patterns and Curves arrays expanded as each is added)
     if (!errcode)
     {
         pr->network.Tank =
@@ -336,79 +345,30 @@ int allocdata(Project *pr)
             (Svalve *)calloc(pr->parser.MaxValves + 1, sizeof(Svalve));
         pr->network.Control =
             (Scontrol *)calloc(pr->parser.MaxControls + 1, sizeof(Scontrol));
-        pr->network.Pattern =
-            (Spattern *)calloc(pr->parser.MaxPats + 1, sizeof(Spattern));
-        pr->network.Curve =
-            (Scurve *)calloc(pr->parser.MaxCurves + 1, sizeof(Scurve));
         ERRCODE(MEMCHECK(pr->network.Tank));
         ERRCODE(MEMCHECK(pr->network.Pump));
         ERRCODE(MEMCHECK(pr->network.Valve));
         ERRCODE(MEMCHECK(pr->network.Control));
-        ERRCODE(MEMCHECK(pr->network.Pattern));
-        ERRCODE(MEMCHECK(pr->network.Curve));
     }
 
-    // Initialize pointers used in patterns, curves, and demand category lists
+    // Initialize pointers used in nodes and links
     if (!errcode)
     {
-        for (n = 0; n <= pr->parser.MaxPats; n++)
-        {
-            pr->network.Pattern[n].Length = 0;
-            pr->network.Pattern[n].F = NULL;
-        }
-        for (n = 0; n <= pr->parser.MaxCurves; n++)
-        {
-            pr->network.Curve[n].Npts = 0;
-            pr->network.Curve[n].Type = GENERIC_CURVE;
-            pr->network.Curve[n].X = NULL;
-            pr->network.Curve[n].Y = NULL;
-        }
         for (n = 0; n <= pr->parser.MaxNodes; n++)
         {
             pr->network.Node[n].D = NULL;    // node demand
+            pr->network.Node[n].S = NULL;    // node source
+            pr->network.Node[n].Comment = NULL;
+        }
+        for (n = 0; n <= pr->parser.MaxLinks; n++)
+        {
+            pr->network.Link[n].Comment = NULL;
         }
     }
 
     // Allocate memory for rule base (see RULES.C)
     if (!errcode) errcode = allocrules(pr);
     return errcode;
-}
-
-void freeTmplist(STmplist *t)
-/*----------------------------------------------------------------
-**  Input:   t = pointer to start of a temporary list
-**  Output:  none
-**  Purpose: frees memory used for temporary storage
-**           of pattern & curve data
-**----------------------------------------------------------------
-*/
-{
-    STmplist *tnext;
-    while (t != NULL)
-    {
-        tnext = t->next;
-        freeFloatlist(t->x);
-        freeFloatlist(t->y);
-        free(t);
-        t = tnext;
-    }
-}
-
-void freeFloatlist(SFloatlist *f)
-/*----------------------------------------------------------------
-**  Input:   f = pointer to start of list of floats
-**  Output:  none
-**  Purpose: frees memory used for storing list of floats
-**----------------------------------------------------------------
-*/
-{
-    SFloatlist *fnext;
-    while (f != NULL)
-    {
-        fnext = f->next;
-        free(f);
-        f = fnext;
-    }
 }
 
 void freedata(Project *pr)
@@ -420,8 +380,6 @@ void freedata(Project *pr)
 */
 {
     int j;
-    Pdemand demand, nextdemand;
-    Psource source;
 
     // Free memory for computed results
     free(pr->hydraul.NodeDemand);
@@ -437,25 +395,27 @@ void freedata(Project *pr)
     // Free memory for node data
     if (pr->network.Node != NULL)
     {
-        for (j = 0; j <= pr->parser.MaxNodes; j++)
+        for (j = 1; j <= pr->parser.MaxNodes; j++)
         {
-            // Free memory used for demand category list
-            demand = pr->network.Node[j].D;
-            while (demand != NULL)
-            {
-                nextdemand = demand->next;
-                free(demand);
-                demand = nextdemand;
-            }
-            // Free memory used for WQ source data
-            source = pr->network.Node[j].S;
-            if (source != NULL) free(source);
+            // Free memory used for demands and WQ source data
+            freedemands(&(pr->network.Node[j]));
+            free(pr->network.Node[j].S);
+            free(pr->network.Node[j].Comment);
         }
         free(pr->network.Node);
     }
 
-    // Free memory for other network objects
+    // Free memory for link data
+    if (pr->network.Link != NULL)
+    {
+        for (j = 0; j <= pr->parser.MaxLinks; j++)
+        {
+            free(pr->network.Link[j].Comment);
+        }
+    }
     free(pr->network.Link);
+
+    // Free memory for other network objects
     free(pr->network.Tank);
     free(pr->network.Pump);
     free(pr->network.Valve);
@@ -464,17 +424,23 @@ void freedata(Project *pr)
     // Free memory for time patterns
     if (pr->network.Pattern != NULL)
     {
-        for (j = 0; j <= pr->parser.MaxPats; j++) free(pr->network.Pattern[j].F);
+        for (j = 0; j <= pr->parser.MaxPats; j++)
+        {
+            free(pr->network.Pattern[j].F);
+            free(pr->network.Pattern[j].Comment);
+        }
         free(pr->network.Pattern);
     }
 
     // Free memory for curves
     if (pr->network.Curve != NULL)
     {
-        for (j = 0; j <= pr->parser.MaxCurves; j++)
+        // There is no Curve[0]
+        for (j = 1; j <= pr->parser.MaxCurves; j++)
         {
             free(pr->network.Curve[j].X);
             free(pr->network.Curve[j].Y);
+            free(pr->network.Curve[j].Comment);
         }
         free(pr->network.Curve);
     }
@@ -493,6 +459,83 @@ void freedata(Project *pr)
     }
 }
 
+Pdemand finddemand(Pdemand d, int index)
+/*----------------------------------------------------------------
+**  Input:   d = pointer to start of a list of demands
+**           index = the position of the demand to retrieve
+**  Output:  none
+**  Returns: the demand at the requested position
+**  Purpose: finds the demand at a given position in a demand list
+**----------------------------------------------------------------
+*/
+{
+    int n = 1;
+    if (index <= 0)return NULL;
+    while (d)
+    {
+        if (n == index) break;
+        n++;
+        d = d->next;
+    }
+    return d;
+}
+
+int adddemand(Snode *node, double dbase, int dpat, char *dname)
+/*----------------------------------------------------------------
+**  Input:   node = a network junction node
+**           dbase = base demand value
+**           dpat = demand pattern index
+**           dname = name of demand category
+**  Output:  returns TRUE if successful, FALSE if not
+**  Purpose: adds a new demand category to a node.
+**----------------------------------------------------------------
+*/
+{
+    Pdemand demand, lastdemand;
+
+    // Create a new demand struct
+    demand = (struct Sdemand *)malloc(sizeof(struct Sdemand));
+    if (demand == NULL) return FALSE;
+
+    // Assign it the designated properties
+    demand->Base = dbase;
+    demand->Pat = dpat;
+    demand->Name = NULL;
+    if (dname && strlen(dname) > 0) xstrcpy(&demand->Name, dname, MAXID);
+    demand->next = NULL;
+
+    // If node has no demands make this its first demand category
+    if (node->D == NULL) node->D = demand;
+
+    // Otherwise append this demand to the end of the node's demands list
+    else
+    {
+        lastdemand = node->D;
+        while (lastdemand->next) lastdemand = lastdemand->next;
+        lastdemand->next = demand;
+    }
+    return TRUE;
+}
+
+void freedemands(Snode *node)
+/*----------------------------------------------------------------
+**  Input:   node = a network junction node
+**  Output:  node
+**  Purpose: frees the memory used for a node's list of demands.
+**----------------------------------------------------------------
+*/
+{
+    Pdemand nextdemand;
+    Pdemand demand = node->D;
+    while (demand != NULL)
+    {
+        nextdemand = demand->next;
+        free(demand->Name);
+        free(demand);
+        demand = nextdemand;
+    }
+    node->D = NULL;
+}
 
 int  buildadjlists(Network *net)
 /*
@@ -768,14 +811,50 @@ int findvalve(Network *network, int index)
     return NOTFOUND;
 }
 
+int findpattern(Network *network, char *id)
+/*----------------------------------------------------------------
+**  Input:   id = time pattern ID
+**  Output:  none
+**  Returns: time pattern index, or -1 if pattern not found
+**  Purpose: finds index of time pattern given its ID
+**----------------------------------------------------------------
+*/
+{
+    int i;
+
+    // Don't forget to include the "dummy" pattern 0 in the search
+    for (i = 0; i <= network->Npats; i++)
+    {
+        if (strcmp(id, network->Pattern[i].ID) == 0) return i;
+    }
+    return -1;
+}
+
+int findcurve(Network *network, char *id)
+/*----------------------------------------------------------------
+**  Input:   id = data curve ID
+**  Output:  none
+**  Returns: data curve index, or 0 if curve not found
+**  Purpose: finds index of data curve given its ID
+**----------------------------------------------------------------
+*/
+{
+    int i;
+    for (i = 1; i <= network->Ncurves; i++)
+    {
+        if (strcmp(id, network->Curve[i].ID) == 0) return i;
+    }
+    return 0;
+}
+
 void adjustpattern(int *pat, int index)
 /*----------------------------------------------------------------
 ** Local function that modifies a reference to a deleted time pattern
 **----------------------------------------------------------------
 */
 {
-    if (*pat == index) *pat = 0;
-    else if (*pat > index) (*pat)--;
+	if (*pat == index) *pat = 0;
+	else if (*pat > index) (*pat)--;
 }
 
 void adjustpatterns(Network *network, int index)
@@ -791,7 +870,7 @@ void adjustpatterns(Network *network, int index)
     Psource source;
 
     // Adjust patterns used by junctions
-    for (j = 1; j <= network->Njuncs; j++)
+    for (j = 1; j <= network->Nnodes; j++)
     {
         // Adjust demand patterns
         for (demand = network->Node[j].D; demand != NULL; demand = demand->next)
@@ -863,6 +942,128 @@ void adjustcurves(Network *network, int index)
     }
 }
 
+int resizecurve(Scurve *curve, int size)
+/*----------------------------------------------------------------
+**  Input:   curve = a data curve object
+**           size = desired number of curve data points
+**  Output:  error code
+**  Purpose: resizes a data curve to a desired size
+**----------------------------------------------------------------
+*/
+{
+    double *x;
+    double *y;
+
+    if (curve->Capacity < size)
+    {
+        x = (double *)realloc(curve->X, size * sizeof(double));
+        if (x == NULL) return 101;
+        y = (double *)realloc(curve->Y, size * sizeof(double));
+        if (y == NULL)
+        {
+            free(x);
+            return 101;
+        }
+        curve->X = x;
+        curve->Y = y;
+        curve->Capacity = size;
+    }
+    return 0;
+}
+
+int  getcomment(Network *network, int object, int index, char *comment)
+//----------------------------------------------------------------
+//  Input:   object = a type of network object
+//           index = index of the specified object
+//           comment = the object's comment string
+//  Output:  error code
+//  Purpose: gets the comment string assigned to an object.
+//----------------------------------------------------------------
+{
+    char *currentcomment;
+
+    // Get pointer to specified object's comment
+    switch (object)
+    {
+    case NODE:
+        if (index < 1 || index > network->Nnodes) return 251;
+        currentcomment = network->Node[index].Comment;
+        break;
+    case LINK:
+        if (index < 1 || index > network->Nlinks) return 251;
+        currentcomment = network->Link[index].Comment;
+        break;
+    case TIMEPAT:
+        if (index < 1 || index > network->Npats) return 251;
+        currentcomment = network->Pattern[index].Comment;
+        break;
+    case CURVE:
+        if (index < 1 || index > network->Ncurves) return 251;
+        currentcomment = network->Curve[index].Comment;
+        break;
+    default:
+        strcpy(comment, "");
+        return 251;
+    }
+
+    // Copy the object's comment to the returned string
+    if (currentcomment) strcpy(comment, currentcomment);
+    else comment[0] = '\0';
+    return 0;
+}
+
+int setcomment(Network *network, int object, int index, const char *newcomment)
+//----------------------------------------------------------------
+//  Input:   object = a type of network object
+//           index = index of the specified object
+//           newcomment = new comment string
+//  Output:  error code
+//  Purpose: sets the comment string of an object.
+//----------------------------------------------------------------
+{
+    char *comment;
+
+    switch (object)
+    {
+    case NODE:
+        if (index < 1 || index > network->Nnodes) return 251;
+        comment = network->Node[index].Comment;
+        network->Node[index].Comment = xstrcpy(&comment, newcomment, MAXMSG);
+        return 0;
+
+    case LINK:
+        if (index < 1 || index > network->Nlinks) return 251;
+        comment = network->Link[index].Comment;
+        network->Link[index].Comment = xstrcpy(&comment, newcomment, MAXMSG);
+        return 0;
+
+    case TIMEPAT:
+        if (index < 1 || index > network->Npats) return 251;
+        comment = network->Pattern[index].Comment;
+        network->Pattern[index].Comment = xstrcpy(&comment, newcomment, MAXMSG);
+        return 0;
+
+    case CURVE:
+        if (index < 1 || index > network->Ncurves) return 251;
+        comment = network->Curve[index].Comment;
+        network->Curve[index].Comment = xstrcpy(&comment, newcomment, MAXMSG);
+        return 0;
+
+    default: return 251;
+    }
+}
+
+int namevalid(const char *name)
+//----------------------------------------------------------------
+//  Input:   name = name used to ID an object
+//  Output:  returns TRUE if name is valid, FALSE if not
+//  Purpose: checks that an object's ID name is valid.
+//----------------------------------------------------------------
+{
+    size_t n = strlen(name);
+    if (n < 1 || n > MAXID || strpbrk(name, " ;") || name[0] == '"') return FALSE;
+    return TRUE;
+}
 
 char *getTmpName(char *fname)
 //----------------------------------------------------------------
@@ -894,6 +1095,46 @@ char *getTmpName(char *fname)
     mkstemp(fname);
 #endif
     return fname;
+}
+
+char *xstrcpy(char **s1, const char *s2, const size_t n)
+//----------------------------------------------------------------
+//  Input:   s1 = destination string
+//           s2 = source string
+//           n = maximum size of strings
+//  Output:  none
+//  Purpose: like strcpy except for dynamic strings.
+//  Note:    The calling program is responsible for ensuring that
+//           s1 points to a valid memory location or is NULL. E.g.,
+//           the following code will likely cause a segment fault:
+//             char *s;
+//             s = xstrcpy(s, "Some text");
+//           while this would work correctly:
+//             char *s = NULL;
+//             s = xstrcpy(s, "Some text");
+//----------------------------------------------------------------
+{
+    size_t n1 = 0, n2 = 0;
+
+    // Find size of source string
+    if (s2) n2 = strlen(s2);
+    if (n2 > n) n2 = n;
+
+    // Source string is empty -- free destination string
+    if (n2 == 0)
+    {
+        free(*s1);
+        *s1 = NULL;
+        return NULL;
+    }
+
+    // See if size of destination string needs to grow
+    if (*s1) n1 = strlen(*s1);
+    if (n2 > n1) *s1 = realloc(*s1, (n2 + 1) * sizeof(char));
+
+    // Copy the source string into the destination string
+    strcpy(*s1, s2);
+    return *s1;
 }
 
 int strcomp(const char *s1, const char *s2)

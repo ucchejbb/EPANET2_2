@@ -57,16 +57,16 @@ IF NOT DEFINED PLATFORM (
 )
 
 :: hack to determine latest tag in epanet-example-networks repo
-:: TODO: use GitHub api instead
 set "LATEST_URL=https://github.com/OpenWaterAnalytics/epanet-example-networks/releases/latest"
 FOR /F delims^=^"^ tokens^=2 %%g IN ('curl --silent %LATEST_URL%') DO ( set "LATEST_TAG=%%~nxg" )
 
-set "TESTFILES_URL=https://github.com/OpenWaterAnalytics/epanet-example-networks/archive/%LATEST_TAG%.zip"
-set "BENCHFILES_URL=https://github.com/OpenWaterAnalytics/epanet-example-networks/releases/download/%LATEST_TAG%/benchmark-%PLATFORM%-%REF_BUILD_ID%.zip"
-
+IF defined LATEST_TAG (
+  set "TESTFILES_URL=https://github.com/OpenWaterAnalytics/epanet-example-networks/archive/%LATEST_TAG%.zip"
+  set "BENCHFILES_URL=https://github.com/OpenWaterAnalytics/epanet-example-networks/releases/download/%LATEST_TAG%/benchmark-%PLATFORM%-%REF_BUILD_ID%.zip"
+) ELSE ( echo ERROR: Unable to determine latest tag & EXIT /B 1 )
 
 :: create a clean directory for staging regression tests
-if exist %TEST_HOME% (
+IF exist %TEST_HOME% (
   rmdir /s /q %TEST_HOME%
 )
 mkdir %TEST_HOME%
@@ -80,9 +80,11 @@ curl -fsSL -o examples.zip %TESTFILES_URL%
 curl -fsSL -o benchmark.zip %BENCHFILES_URL%
 
 
-:: extract tests and benchmarks
+:: extract tests, benchmarks, and manifest
 7z x examples.zip *\epanet-tests\* > nul
 7z x benchmark.zip -obenchmark\ > nul
+7z e benchmark.zip -o. manifest.json -r > nul
+
 
 :: set up symlink for tests directory
 mklink /D .\tests .\epanet-example-networks-%LATEST_TAG:~1%\epanet-tests > nul

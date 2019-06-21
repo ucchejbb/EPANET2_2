@@ -3,26 +3,23 @@
 Project:      OWA EPANET
 Version:      2.2
 Module:       input1.c
-Description:  retrieves network data from an EPANET input file 
+Description:  retrieves network data from an EPANET input file
 Authors:      see AUTHORS
 Copyright:    see AUTHORS
 License:      see LICENSE
-Last Updated: 12/15/2018
+Last Updated: 05/15/2019
 ******************************************************************************
 */
 
-#include <stdio.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
-#ifndef __APPLE__
-#include <malloc.h>
-#endif
+#include <math.h>
 
 #include "types.h"
 #include "funcs.h"
 #include "hash.h"
 #include "text.h"
-#include <math.h>
 
 // Default values
 #define MAXITER  200  // Default max. # hydraulic iterations
@@ -56,7 +53,7 @@ int getdata(Project *pr)
     int errcode = 0;
 
     // Assign default data values & reporting options
-    setdefaults(pr);           
+    setdefaults(pr);
     initreport(&pr->report);
 
     // Read in network data
@@ -100,9 +97,10 @@ void setdefaults(Project *pr)
     parser->Unitsflag = US;     // US unit system
     parser->Flowflag = GPM;     // Flow units are gpm
     parser->Pressflag = PSI;    // Pressure units are psi
+    parser->DefPat = 0;         // Default demand pattern index
     out->Hydflag = SCRATCH;     // No external hydraulics file
     rpt->Tstatflag = SERIES;    // Generate time series output
-    
+
     hyd->Formflag = HW;         // Use Hazen-Williams formula
     hyd->Htol = HTOL;           // Default head tolerance
     hyd->Qtol = QTOL;           // Default flow tolerance
@@ -117,7 +115,6 @@ void setdefaults(Project *pr)
     hyd->ExtraIter = -1;        // Stop if network unbalanced
     hyd->Viscos = MISSING;      // Temporary viscosity
     hyd->SpGrav = SPGRAV;       // Default specific gravity
-    hyd->DefPat = 0;            // Default demand pattern index
     hyd->Epat = 0;              // No energy price pattern
     hyd->Ecost = 0.0;           // Zero unit energy cost
     hyd->Dcost = 0.0;           // Zero energy demand charge
@@ -324,18 +321,15 @@ void adjustdata(Project *pr)
         tank = &net->Tank[i];
         if (tank->Kb == MISSING) tank->Kb = qual->Kbulk;
     }
-
-    // Use default pattern if none assigned to a demand
-    for (i = 1; i <= net->Nnodes; i++)
+ 
+	// Use default pattern if none assigned to a demand
+	parser->DefPat = findpattern(net, parser->DefPatID);
+	if (parser->DefPat > 0) for (i = 1; i <= net->Nnodes; i++)
     {
         node = &net->Node[i];
         for (demand = node->D; demand != NULL; demand = demand->next)
         {
-            if (demand->Pat == 0)
-            {
-                demand->Pat = hyd->DefPat;
-                strcpy(demand->Name, "");
-            }
+            if (demand->Pat == 0) demand->Pat = parser->DefPat;
         }
     }
 
@@ -353,7 +347,7 @@ int inittanks(Project *pr)
 */
 {
     Network *net = &pr->network;
-    
+
     int i, j, n = 0;
     double a;
     int errcode = 0, levelerr;
@@ -546,7 +540,7 @@ void convertunits(Project *pr)
     Slink *link;
     Spump *pump;
     Scontrol *control;
-  
+
     // Convert nodal elevations & initial WQ
     // (WQ source units are converted in QUALITY.C
     for (i = 1; i <= net->Nnodes; i++)
@@ -565,6 +559,7 @@ void convertunits(Project *pr)
             demand->Base /= pr->Ucf[DEMAND];
         }
     }
+
     hyd->Pmin /= pr->Ucf[PRESSURE];
     hyd->Preq /= pr->Ucf[PRESSURE];
 
@@ -644,7 +639,7 @@ void convertunits(Project *pr)
                     pump->H0 /= pr->Ucf[HEAD];
                     pump->R *= (pow(pr->Ucf[FLOW], pump->N) / pr->Ucf[HEAD]);
                 }
-        
+
                 // Convert flow range & max. head units
                 pump->Q0 /= pr->Ucf[FLOW];
                 pump->Qmax /= pr->Ucf[FLOW];
@@ -653,7 +648,7 @@ void convertunits(Project *pr)
         }
         else
         {
-            // For flow control valves, convert flow setting 
+            // For flow control valves, convert flow setting
             // while for other valves convert pressure setting
             link->Diam /= pr->Ucf[DIAM];
             link->Km = 0.02517 * link->Km / SQR(link->Diam) / SQR(link->Diam);

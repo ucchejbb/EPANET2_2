@@ -7,14 +7,11 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 02/08/2019
+ Last Updated: 05/15/2019
  ******************************************************************************
 */
-#ifndef __APPLE__
-#include <malloc.h>
-#else
+
 #include <stdlib.h>
-#endif
 #include <string.h>
 
 #include "types.h"
@@ -110,6 +107,16 @@ int DLLEXPORT ENgettitle(char *line1, char *line2, char *line3)
 int DLLEXPORT ENsettitle(char *line1, char *line2, char *line3)
 {
     return EN_settitle(_defaultProject, line1, line2, line3) ;
+}
+
+int DLLEXPORT ENgetcomment(int object, int index, char *comment)
+{
+    return EN_getcomment(_defaultProject, object, index, comment);
+}
+
+int  DLLEXPORT ENsetcomment(int object, int index, char *comment)
+{
+    return EN_setcomment(_defaultProject, object, index, comment);
 }
 
 int DLLEXPORT ENgetcount(int object, int *count)
@@ -282,9 +289,9 @@ int DLLEXPORT ENsetqualtype(int qualType, char *chemName, char *chemUnits,
 
 ********************************************************************/
 
-int DLLEXPORT ENaddnode(char *id, int nodeType)
+int DLLEXPORT ENaddnode(char *id, int nodeType, int *index)
 {
-    return EN_addnode(_defaultProject, id, nodeType);
+    return EN_addnode(_defaultProject, id, nodeType, index);
 }
 
 int DLLEXPORT ENdeletenode(int index, int actionCode)
@@ -373,6 +380,22 @@ int DLLEXPORT ENsetdemandmodel(int model, EN_API_FLOAT_TYPE pmin,
     return EN_setdemandmodel(_defaultProject, model, pmin, preq, pexp);
 }
 
+int DLLEXPORT ENadddemand(int nodeIndex, EN_API_FLOAT_TYPE baseDemand,
+    char *demandPattern, char *demandName)
+{
+    return EN_adddemand(_defaultProject, nodeIndex, baseDemand, demandPattern, demandName);
+}
+
+int DLLEXPORT ENdeletedemand(int nodeIndex, int demandIndex)
+{
+    return EN_deletedemand(_defaultProject, nodeIndex, demandIndex);
+}
+
+int DLLEXPORT ENgetdemandindex(int nodeIndex, char *demandName, int *demandIndex)
+{
+    return EN_getdemandindex(_defaultProject, nodeIndex, demandName, demandIndex);
+}
+
 int DLLEXPORT ENgetnumdemands(int nodeIndex, int *numDemands)
 {
     return EN_getnumdemands(_defaultProject, nodeIndex, numDemands);
@@ -419,9 +442,9 @@ int DLLEXPORT ENsetdemandname(int nodeIndex, int demandIndex, char *demandName)
 
 ********************************************************************/
 
-int DLLEXPORT ENaddlink(char *id, int linkType, char *fromNode, char *toNode)
+int DLLEXPORT ENaddlink(char *id, int linkType, char *fromNode, char *toNode, int *index)
 {
-    return EN_addlink(_defaultProject, id, linkType, fromNode, toNode);
+    return EN_addlink(_defaultProject, id, linkType, fromNode, toNode, index);
 }
 
 int DLLEXPORT ENdeletelink(int index, int actionCode)
@@ -635,7 +658,7 @@ int DLLEXPORT ENsetcurvevalue(int curveIndex, int pointIndex, EN_API_FLOAT_TYPE 
 }
 
 int DLLEXPORT ENgetcurve(int index, char *id, int *nPoints,
-              EN_API_FLOAT_TYPE **xValues, EN_API_FLOAT_TYPE **yValues)
+              EN_API_FLOAT_TYPE *xValues, EN_API_FLOAT_TYPE *yValues)
 {
     int i;
     Network *net = &_defaultProject->network;
@@ -647,8 +670,8 @@ int DLLEXPORT ENgetcurve(int index, char *id, int *nPoints,
     *nPoints = curve->Npts;
     for (i = 0; i < curve->Npts; i++)
     {
-        *xValues[i] = (EN_API_FLOAT_TYPE)curve->X[i];
-        *yValues[i] = (EN_API_FLOAT_TYPE)curve->Y[i];
+        xValues[i] = (EN_API_FLOAT_TYPE)curve->X[i];
+        yValues[i] = (EN_API_FLOAT_TYPE)curve->Y[i];
     }
     return 0;
 }

@@ -7,16 +7,13 @@ Description:  parses network data from a line of an EPANET input file
 Authors:      see AUTHORS
 Copyright:    see AUTHORS
 License:      see LICENSE
-Last Updated: 01/01/2019
+Last Updated: 05/24/2019
 ******************************************************************************
 */
 
-#include <stdio.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
-#ifndef __APPLE__
-#include <malloc.h>
-#endif
 #include <math.h>
 
 #include "types.h"
@@ -36,7 +33,6 @@ int powercurve(double, double, double, double, double, double *, double *,
 // Imported Functions
 extern int addnodeID(Network *, int, char *);
 extern int addlinkID(Network *, int, char *);
-extern STmplist *getlistitem(char *, STmplist *);
 
 // Local functions
 static int  optionchoice(Project *, int);
@@ -77,13 +73,11 @@ int juncdata(Project *pr)
     Parser  *parser = &pr->parser;
     Hydraul *hyd = &pr->hydraul;
 
-    int p = 0;          // time pattern index
-    int n;              // number of tokens
-    int njuncs;         // number of network junction nodes
-    double el,          // elevation
-           y = 0.0;     // base demand
-    Pdemand demand;     // demand record
-    STmplist *patlist;  // list of demands
+    int p = 0;                  // time pattern index
+    int n;                      // number of tokens
+    int njuncs;                 // number of network junction nodes
+    double el,                  // elevation
+           y = 0.0;             // base demand
     Snode *node;
 
     // Add new junction to data base
@@ -100,9 +94,8 @@ int juncdata(Project *pr)
     if (n >= 3 && !getfloat(parser->Tok[2], &y)) return setError(parser, 2, 202);
     if (n >= 4)
     {
-        patlist = getlistitem(parser->Tok[3], parser->Patlist);
-        if (patlist == NULL) return setError(parser, 3, 205);
-        p = patlist->i;
+        p = findpattern(net, parser->Tok[3]);
+        if (p < 0) return setError(parser, 3, 205);
     }
 
     // Save junction data
@@ -115,17 +108,11 @@ int juncdata(Project *pr)
     node->Ke = 0.0;
     node->Rpt = 0;
     node->Type = JUNCTION;
-    strcpy(node->Comment, parser->Comment);
+    node->Comment = xstrcpy(&node->Comment, parser->Comment, MAXMSG);
 
-
-    // create a demand record, even if no demand is specified here.
-    demand = (struct Sdemand *) malloc(sizeof(struct Sdemand));
-    if (demand == NULL) return 101;
-    demand->Base = y;
-    demand->Pat = p;
-    strncpy(demand->Name, "", MAXMSG);
-    demand->next = NULL;
-    node->D = demand;
+    // Create a demand for the junction and use NodeDemand as an indicator
+    // to be used when processing demands from the [DEMANDS] section
+    if (!adddemand(node, y, p, NULL)) return 101;
     hyd->NodeDemand[njuncs] = y;
     return 0;
 }
@@ -159,7 +146,6 @@ int tankdata(Project *pr)
            minvol = 0.0,    // Minimum volume
            diam = 0.0,      // Diameter
            area;            // X-sect. area
-    STmplist *tmplist;
     Snode *node;
     Stank *tank;
 
@@ -183,9 +169,8 @@ int tankdata(Project *pr)
         // Head pattern supplied
         if (n == 3)
         {
-            tmplist = getlistitem(parser->Tok[2], parser->Patlist);
-            if (tmplist == NULL) return setError(parser, 2, 205);
-            pattern = tmplist->i;
+            pattern = findpattern(net, parser->Tok[2]);
+            if (pattern < 0) return setError(parser, 2, 205);
         }
     }
     else if (n < 6) return 201;
@@ -202,9 +187,8 @@ int tankdata(Project *pr)
         // If volume curve supplied check it exists
         if (n == 8)
         {
-            tmplist = getlistitem(parser->Tok[7], parser->Curvelist);
-            if (tmplist == NULL) return setError(parser, 7, 206);
-            curve = tmplist->i;
+            curve = findcurve(net, parser->Tok[7]);
+            if (curve == 0) return setError(parser, 7, 206);
             net->Curve[curve].Type = VOLUME_CURVE;
         }
         if (initlevel < 0.0) return setError(parser, 2, 209);
@@ -224,7 +208,7 @@ int tankdata(Project *pr)
     node->S = NULL;
     node->Ke = 0.0;
     node->Type = (diam == 0) ? RESERVOIR : TANK;
-    strcpy(node->Comment, parser->Comment);
+    node->Comment = xstrcpy(&node->Comment, parser->Comment, MAXMSG);
     tank->Node = i;
     tank->H0 = initlevel;
     tank->Hmin = minlevel;
@@ -242,8 +226,7 @@ int tankdata(Project *pr)
     tank->Vmin = area * minlevel;
     if (minvol > 0.0) tank->Vmin = minvol;
     tank->V0 = tank->Vmin + area * (initlevel - minlevel);
-    tank->Vmax = tank->Vmin + area * (maxlevel - minlevel);
-
+	tank->Vmax = tank->Vmin + area * (maxlevel - minlevel);
     tank->Vcurve = curve;
     tank->MixModel = MIX1; // Completely mixed
     tank->V1max = 1.0;     // Mixing compartment size fraction
@@ -329,7 +312,7 @@ int pipedata(Project *pr)
     link->Type = type;
     link->Status = status;
     link->Rpt = 0;
-    strcpy(link->Comment, parser->Comment);
+    link->Comment = xstrcpy(&link->Comment, parser->Comment, MAXMSG);
     return 0;
 }
 
@@ -354,12 +337,12 @@ int pumpdata(Project *pr)
     Network *net = &pr->network;
     Parser  *parser = &pr->parser;
 
-    int    j,
+    int    j, m,  // Token array indexes
            j1,    // Start-node index
            j2,    // End-node index
-           m, n;  // # data items
+           n,     // # data items
+           c, p;  // Curve & Pattern indexes
     double y;
-    STmplist *tmplist; // Temporary list
     Slink *link;
     Spump *pump;
 
@@ -392,7 +375,7 @@ int pumpdata(Project *pr)
     link->Type = PUMP;
     link->Status = OPEN;
     link->Rpt = 0;
-    strcpy(link->Comment, parser->Comment);
+    link->Comment = xstrcpy(&link->Comment, parser->Comment, MAXMSG);
     pump->Link = net->Nlinks;
     pump->Ptype = NOCURVE; // NOCURVE is a placeholder
     pump->Hcurve = 0;
@@ -429,15 +412,15 @@ int pumpdata(Project *pr)
         }
         else if (match(parser->Tok[m - 1], w_HEAD))  // Custom pump curve
         {
-            tmplist = getlistitem(parser->Tok[m], parser->Curvelist);
-            if (tmplist == NULL) return setError(parser, m, 206);
-            pump->Hcurve = tmplist->i;
+            c = findcurve(net, parser->Tok[m]);
+            if (c == 0) return setError(parser, m, 206);
+            pump->Hcurve = c;
         }
         else if (match(parser->Tok[m - 1], w_PATTERN))  // Speed/status pattern
         {
-            tmplist = getlistitem(parser->Tok[m], parser->Patlist);
-            if (tmplist == NULL) return setError(parser, m, 205);
-            pump->Upat = tmplist->i;
+            p = findpattern(net, parser->Tok[m]);
+            if (p < 0) return setError(parser, m, 205);
+            pump->Upat = p;
         }
         else if (match(parser->Tok[m - 1], w_SPEED))   // Speed setting
         {
@@ -466,7 +449,8 @@ int valvedata(Project *pr)
     Network *net = &pr->network;
     Parser  *parser = &pr->parser;
 
-    int j1,                    // Start-node index
+    int c,                     // Curve index
+        j1,                    // Start-node index
         j2,                    // End-node index
         n;                     // # data items
     char  status = ACTIVE,     // Valve status
@@ -474,7 +458,6 @@ int valvedata(Project *pr)
     double diam = 0.0,         // Valve diameter
            setting,            // Valve setting
            lcoeff = 0.0;       // Minor loss coeff.
-    STmplist *tmplist;         // Temporary list
     Slink *link;
 
     // Add new valve to data base
@@ -505,10 +488,10 @@ int valvedata(Project *pr)
     // Find headloss curve for GPV
     if (type == GPV)
     {
-        tmplist = getlistitem(parser->Tok[5], parser->Curvelist);
-        if (tmplist == NULL) return setError(parser, 5, 206);
-        setting = tmplist->i;
-        net->Curve[tmplist->i].Type = HLOSS_CURVE;
+        c = findcurve(net, parser->Tok[5]);
+        if (c == 0) return setError(parser, 5, 206);
+        setting = c;
+        net->Curve[c].Type = HLOSS_CURVE;
         status = OPEN;
     }
     else if (!getfloat(parser->Tok[5], &setting)) return setError(parser, 5, 202);
@@ -535,7 +518,7 @@ int valvedata(Project *pr)
     link->Type = type;
     link->Status = status;
     link->Rpt = 0;
-    strcpy(link->Comment, parser->Comment);
+    link->Comment = xstrcpy(&link->Comment, parser->Comment, MAXMSG);
     net->Valve[net->Nvalves].Link = net->Nlinks;
     return 0;
 }
@@ -555,37 +538,47 @@ int patterndata(Project *pr)
     Network *net = &pr->network;
     Parser  *parser = &pr->parser;
 
-    int i, n;
+    int i, j, n, n1;
     double x;
-    SFloatlist *f;
-    STmplist *p;
+    Spattern *pattern;
 
+    // "n" is the number of pattern factors contained in the line
     n = parser->Ntokens - 1;
     if (n < 1) return 201;
 
-    // Check for a new pattern
-    if (parser->PrevPat != NULL &&
-        strcmp(parser->Tok[0], parser->PrevPat->ID) == 0) p = parser->PrevPat;
-    else p = getlistitem(parser->Tok[0], parser->Patlist);
-    if (p == NULL) return setError(parser, 0, 205);
-
-    // Add parsed multipliers to the pattern
-    for (i = 1; i <= n; i++)
+    // Check if previous input line was for the same pattern
+    if (parser->PrevPat && strcmp(parser->Tok[0], parser->PrevPat->ID) == 0)
     {
-        if (!getfloat(parser->Tok[i], &x)) return setError(parser, i, 202);
-        f = (SFloatlist *)malloc(sizeof(SFloatlist));
-        if (f == NULL) return 101;
-        f->value = x;
-        f->next = p->x;
-        p->x = f;
+        pattern = parser->PrevPat;
     }
 
-    // Save # multipliers for pattern
-    net->Pattern[p->i].Length += n;
+    // Otherwise retrieve pattern from the network's Pattern array
+    else
+    {
+        i = findpattern(net, parser->Tok[0]);
+        if (i <= 0) return setError(parser, 0, 205);
+        pattern = &(net->Pattern[i]);
+        if (pattern->Comment == NULL && parser->Comment[0])
+        {
+            pattern->Comment = xstrcpy(&pattern->Comment, parser->Comment, MAXMSG);
+        }
+    }
 
-    // Set previous pattern pointer
-    parser->PrevPat = p;
-    return (0);
+    // Expand size of the pattern's factors array
+    n1 = pattern->Length;
+    pattern->Length += n;
+    pattern->F = realloc(pattern->F, pattern->Length * sizeof(double));
+
+    // Add parsed multipliers to the pattern
+    for (j = 1; j <= n; j++)
+    {
+        if (!getfloat(parser->Tok[j], &x)) return setError(parser, j, 202);
+        pattern->F[n1 + j - 1] = x;
+    }
+
+    // Save a reference to this pattern for processing additional pattern data
+    parser->PrevPat = pattern;
+    return 0;
 }
 
 int curvedata(Project *pr)
@@ -603,40 +596,46 @@ int curvedata(Project *pr)
     Network *net = &pr->network;
     Parser  *parser = &pr->parser;
 
+    int i;
     double x, y;
-    SFloatlist *fx, *fy;
-    STmplist *c;
-
-    // Check for valid curve ID
-    if (parser->Ntokens < 3) return 201;
-    if (parser->PrevCurve != NULL &&
-        strcmp(parser->Tok[0], parser->PrevCurve->ID) == 0) c = parser->PrevCurve;
-    else c = getlistitem(parser->Tok[0], parser->Curvelist);
-    if (c == NULL) return setError(parser, 0, 206);
+    Scurve *curve;
 
     // Check for valid data
+    if (parser->Ntokens < 3) return 201;
     if (!getfloat(parser->Tok[1], &x)) return setError(parser, 1, 202);
     if (!getfloat(parser->Tok[2], &y)) return setError(parser, 2, 202);
 
-    // Add new data point to curve
-    fx = (SFloatlist *)malloc(sizeof(SFloatlist));
-    if (fx == NULL) return 101;
-    fy = (SFloatlist *)malloc(sizeof(SFloatlist));
-    if (fy == NULL)
+    // Check if previous input line was for the same curve
+    if (parser->PrevCurve && strcmp(parser->Tok[0], parser->PrevCurve->ID) == 0)
     {
-        free(fx);
-        return 101;
+        curve = parser->PrevCurve;
     }
-    fx->value = x;
-    fx->next = c->x;
-    c->x = fx;
-    fy->value = y;
-    fy->next = c->y;
-    c->y = fy;
-    net->Curve[c->i].Npts++;
 
-    // Save the pointer to this curve
-    parser->PrevCurve = c;
+    // Otherwise retrieve curve from the network's Curve array
+    else
+    {
+        i = findcurve(net, parser->Tok[0]);
+        if (i == 0) return setError(parser, 0, 206);
+        curve = &(net->Curve[i]);
+        if (curve->Comment == NULL && parser->Comment[0])
+        {
+            curve->Comment = xstrcpy(&curve->Comment, parser->Comment, MAXMSG);
+        }
+    }
+
+    // Expand size of data arrays if need be
+    if (curve->Capacity == curve->Npts)
+    {
+        if (resizecurve(curve, curve->Capacity + 10) > 0) return 101;
+    }
+
+    // Add new data point to curve
+    curve->X[curve->Npts] = x;
+    curve->Y[curve->Npts] = y;
+    curve->Npts++;
+
+    // Save a reference to this curve for processing additional curve data
+    parser->PrevCurve = curve;
     return 0;
 }
 
@@ -696,9 +695,8 @@ int demanddata(Project *pr)
 
     int j, n, p = 0;
     double y;
+
     Pdemand demand;
-    Pdemand cur_demand;
-    STmplist *patlist;
 
     // Extract data from tokens
     n = parser->Ntokens;
@@ -718,36 +716,27 @@ int demanddata(Project *pr)
     if (j > net->Njuncs) return 0;
     if (n >= 3)
     {
-        patlist = getlistitem(parser->Tok[2], parser->Patlist);
-        if (patlist == NULL) return setError(parser, 2, 205);
-        p = patlist->i;
+        p = findpattern(net, parser->Tok[2]);
+        if (p < 0) return setError(parser, 2, 205);
     }
 
     // Replace any demand entered in [JUNCTIONS] section
     demand = net->Node[j].D;
-    if (hyd->NodeDemand[j] != MISSING)
+    if (demand && hyd->NodeDemand[j] != MISSING)
     {
-        // First category encountered will overwrite "dummy" demand category
-        // with what is specified in this section
+        // First category encountered will overwrite demand category
+        // created when junction was read from [JUNCTIONS] section
         demand->Base = y;
         demand->Pat = p;
-        strncpy(demand->Name, parser->Comment, MAXMSG);
+        if (parser->Comment[0])
+        {
+            demand->Name = xstrcpy(&demand->Name, parser->Comment, MAXID);
+        }
         hyd->NodeDemand[j] = MISSING; // marker - next iteration will append a new category.
     }
 
     // Otherwise add new demand to junction
-    else
-    {
-        cur_demand = net->Node[j].D;
-        while (cur_demand->next != NULL) cur_demand = cur_demand->next;
-        demand = (struct Sdemand *)malloc(sizeof(struct Sdemand));
-        if (demand == NULL) return 101;
-        demand->Base = y;
-        demand->Pat = p;
-        strncpy(demand->Name, parser->Comment, MAXMSG);
-        demand->next = NULL;
-        cur_demand->next = demand;
-    }
+    else if (!adddemand(&net->Node[j], y, p, parser->Comment) > 0) return 101;
     return 0;
 }
 
@@ -870,7 +859,7 @@ int sourcedata(Project *pr)
 **  Purpose: processes water quality source data
 **  Formats:
 **     [SOURCE]
-**        node  sourcetype  quality  (pattern start stop)
+**        node  sourcetype  quality  (pattern)
 **
 **  NOTE: units of mass-based source are mass/min
 **--------------------------------------------------------------
@@ -885,7 +874,6 @@ int sourcedata(Project *pr)
         p = 0;          // Time pattern index
     char type = CONCEN; // Source type
     double c0 = 0;      // Initial quality
-    STmplist *patlist;
     Psource source;
 
     // Check for enough tokens & that source node exists
@@ -914,9 +902,8 @@ int sourcedata(Project *pr)
     if (n > i + 1 && strlen(parser->Tok[i + 1]) > 0 &&
         strcmp(parser->Tok[i + 1], "*") != 0)
     {
-        patlist = getlistitem(parser->Tok[i + 1], parser->Patlist);
-        if (patlist == NULL) return setError(parser, i+1, 205);
-        p = patlist->i;
+        p = findpattern(net, parser->Tok[i + 1]);
+        if (p < 0) return setError(parser, i + 1, 205);
     }
 
     // Destroy any existing source assigned to node
@@ -940,7 +927,7 @@ int emitterdata(Project *pr)
 **  Purpose: processes junction emitter data
 **  Format:
 **     [EMITTER]
-**        node   K
+**        node   Ke
 **--------------------------------------------------------------
 */
 {
@@ -1320,10 +1307,9 @@ int energydata(Project *pr)
     Hydraul *hyd = &pr->hydraul;
     Parser  *parser = &pr->parser;
 
-    int j, k, n;
+    int j, k, n, p, c;
     double y;
 
-    STmplist *listitem;
     Slink *Link = net->Link;
     Spump *Pump = net->Pump;
 
@@ -1370,10 +1356,10 @@ int energydata(Project *pr)
     // Price PATTERN being set
     else if (match(parser->Tok[n - 2], w_PATTERN))
     {
-        listitem = getlistitem(parser->Tok[n - 1], parser->Patlist);
-        if (listitem == NULL) return setError(parser, n - 1, 205);
-        if (j == 0) hyd->Epat = listitem->i;
-        else        Pump[j].Epat = listitem->i;
+        p = findpattern(net, parser->Tok[n - 1]);
+        if (p < 0) return setError(parser, n - 1, 205);
+        if (j == 0) hyd->Epat = p;
+        else        Pump[j].Epat = p;
         return 0;
     }
 
@@ -1388,10 +1374,10 @@ int energydata(Project *pr)
         }
         else
         {
-            listitem = getlistitem(parser->Tok[n - 1], parser->Curvelist);
-            if (listitem == NULL) return setError(parser, n - 1, 206);
-            Pump[j].Ecurve = listitem->i;
-            net->Curve[listitem->i].Type = EFFIC_CURVE;
+            c = findcurve(net, parser->Tok[n - 1]);
+            if (c == 0) return setError(parser, n - 1, 206);
+            Pump[j].Ecurve = c;
+            net->Curve[c].Type = EFFIC_CURVE;
         }
         return 0;
     }
@@ -1681,7 +1667,7 @@ int optionchoice(Project *pr, int n)
 **    VERIFY              filename
 **    UNBALANCED          STOP/CONTINUE {Niter}
 **    PATTERN             id
-**    DEMAND MODEL        DDA/PDA/PPA
+**    DEMAND MODEL        DDA/PDA
 **--------------------------------------------------------------
 */
 {
@@ -1840,8 +1826,8 @@ int optionvalue(Project *pr, int n)
 **    TRIALS              value
 **    ACCURACY            value
 
-**    HEADLIMIT           value
-**    FLOWLIMIT           value
+**    HEADERROR           value
+**    FLOWCHANGE          value
 **    MINIMUM PRESSURE    value
 **    REQUIRED PRESSURE   value
 **    PRESSURE EXPONENT   value
